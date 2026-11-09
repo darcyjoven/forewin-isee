@@ -1,0 +1,3 @@
+[submodule "isee-core"]
+	path = isee-core
+	url = https://github.com/darcyjoven/isee-core.git
