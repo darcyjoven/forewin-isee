@@ -1,0 +1,102 @@
+{
+    "date": "01-Aug-2026",
+    "time": "2026-09-05 11:49:31",
+    "remaining": "0",
+    "curr_rate": 6.7894000000,
+    "previous_rate": 6.8067000000,
+    "last_month": "Jul",
+    "product": {
+        "normal": {
+            "day": {
+                "fpc": 188.021,
+                "smt": 41.561,
+                "comp": 28.953
+            },
+            "month": {
+                "fpc": 188.021,
+                "smt": 41.561,
+                "comp": 28.953
+            }
+        },
+        "rework_in": {
+            "day": {
+                "fpc": 7.998,
+                "smt": 0.784,
+                "comp": 0.000
+            },
+            "month": {
+                "fpc": 7.998,
+                "smt": 0.784,
+                "comp": 0.000
+            }
+        },
+        "rework_out": {
+            "day": {
+                "fpc": 10.033,
+                "smt": 0.310,
+                "comp": 0.037
+            },
+            "month": {
+                "fpc": 10.033,
+                "smt": 0.310,
+                "comp": 0.037
+            }
+        }
+    },
+    "sale": {
+        "normal": {
+            "day": {
+                "fpc": 32.767,
+                "smt": 1.703,
+                "comp": 3.090
+            },
+            "month": {
+                "fpc": 32.767,
+                "smt": 1.703,
+                "comp": 3.090
+            }
+        },
+        "return": {
+            "day": {
+                "fpc": 0.000,
+                "smt": 0.000,
+                "comp": 0.000
+            },
+            "month": {
+                "fpc": 0.000,
+                "smt": 0.000,
+                "comp": 0.000
+            }
+        },
+        "discount": {
+            "day": 0.000,
+            "month": 0.000
+        },
+        "resell": {
+            "day": 0.000,
+            "month": 0.000
+        },
+        "unsign": {
+            "fpc": 91.214,
+            "smt": 10.433,
+            "comp": 14.622,
+            "sample": 43.565
+        }
+    },
+    "stock": {
+        "normal": 4071.356,
+        "sample": 88.026,
+        "inaction": 448.225,
+        "return": 139.407
+    },
+    "forecast": {
+        "sale": {
+            "day": 290.336,
+            "month": 9000.416
+        },
+        "product": {
+            "day": 246.000,
+            "month": 9000.404
+        }
+    }
+}
