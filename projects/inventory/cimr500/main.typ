@@ -95,7 +95,7 @@
 
   company-header()
   table(
-    columns: (1.4fr, 1fr, 3fr),
+    columns: (1.5fr, 1fr, 3fr),
     fill: rgb(219, 238, 244),
     //stroke: (top: none, left: none, right: none, bottom: 1pt + black),
     align: (x, y) => { if x == 0 { right } else if x == 1 { left } else { center } },
@@ -302,7 +302,9 @@
     // 累计出货
     table.cell(rowspan: 2, align: horizon)[Cumulative sales],
     table.cell(rowspan: 2, align: horizon)[累计销售],
-    [#number(month-sale + data.forecast.sale.month, 2)W],
+    [#number((
+        data.sale.normal.month.smt + data.sale.normal.month.fpc + data.sale.normal.month.comp - data.sale.return.month.smt - data.sale.return.month.fpc - data.sale.return.month.comp - data.sale.discount.month
+      ), 2)W],
     table.cell(
       align: left,
     )[FPC:#number(data.sale.normal.month.fpc - data.sale.return.month.fpc, 2)W SMT:#number(data.sale.normal.month.smt - data.sale.return.month.smt, 2)W COMP:#number(data.sale.normal.month.comp - data.sale.return.month.comp, 2)W DCT:#number(-data.sale.discount.month, 2)W],
@@ -333,7 +335,7 @@
     table.cell(
       fill: rgb(255, 255, 0),
       text(fill: red)[*#number((
-        month-sale + data.forecast.sale.month + data.sale.resell.month + data.sale.unsign.fpc + data.sale.unsign.smt + data.sale.unsign.comp
+        (data.sale.normal.month.smt + data.sale.normal.month.fpc + data.sale.normal.month.comp - data.sale.return.month.smt - data.sale.return.month.fpc - data.sale.return.month.comp - data.sale.discount.month) + (data.sale.resell.month) + (data.sale.unsign.fpc + data.sale.unsign.smt + data.sale.unsign.comp)
       ), 2)W ★★★★★*],
     ),
     table.cell(align: left, fill: rgb(255, 255, 0), text(
