@@ -1,0 +1,15 @@
+{
+  "_说明": "复制本文件为 .deploy.json，按实际环境修改。连接只用 SSH key，不要写密码。",
+
+  "target": "user@192.168.1.100",
+  "remote_dir": "~/typst",
+
+  "_remote_dir说明": "生产端项目根目录。字体/core 默认同步到其下的 fonts/ 和 isee-core/。",
+
+  "remote_fonts_dir": "~/typst/fonts",
+  "remote_core_dir": "~/typst/isee-core",
+  "remote_pkgs_dir": "~/.cache/typst/packages/preview",
+
+  "_local_packages说明": "留空则自动探测：Windows=%LOCALAPPDATA%/typst/packages/preview，Linux=~/.cache/typst/packages/preview。一般不用填。",
+  "local_packages_dir": ""
+}

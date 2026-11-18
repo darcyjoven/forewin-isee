@@ -1,0 +1,106 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "cwd": "${workspaceFolder}"
+  },
+  "tasks": [
+    {
+      "label": "部署 1: 只上传项目模板",
+      "detail": "仅同步 .typ/.json/脚本等项目文件，不含字体、isee-core、第三方包。",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "deploy.py",
+        "project"
+      ],
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "部署 2: 初始化（全量上传）",
+      "detail": "首次部署用：全量上传 字体 + isee-core + 项目文件 + 第三方包，并写入版本标记。",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "deploy.py",
+        "init"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "部署 3: 同步第三方包",
+      "detail": "只同步 typst 第三方包目录（ctyp/zero/lilaq 等）。",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "deploy.py",
+        "packages"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "部署 4: 同步字体文件",
+      "detail": "只同步 fonts/ 下的字体（大文件，未变化会自动跳过）。",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "deploy.py",
+        "fonts"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "部署 5: 全量上传（检测版本落后）",
+      "detail": "全量上传前先用 git 提交号检测生产端是否落后当前版本，随后同步全部内容。",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "deploy.py",
+        "full"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "label": "部署 0: 预览全部（dry-run）",
+      "detail": "安全预览：对所有层只列出将被传输的文件，不做任何改动。",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "deploy.py",
+        "full",
+        "--dry-run"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
+    }
+  ]
+}

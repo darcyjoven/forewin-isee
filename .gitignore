@@ -11,3 +11,11 @@ json
 
 # table 模块的示例输入 JSON 需要纳入版本管理
 !templates/table/*.json
+
+# 部署配置：模板入库，本地实际配置与版本标记不入库
+!.deploy.example.json
+.deploy.json
+.deploy-version
+
+# VSCode 的 tasks.json 需要纳入版本管理
+!.vscode/tasks.json
