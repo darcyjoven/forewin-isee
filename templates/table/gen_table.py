@@ -271,7 +271,9 @@ TRAILING_LINE  }
         ),
         colspan: widths.len(),
         inset: 0pt,
-        stroke: none,
+        // 自画上下横线：相邻两组都只有一行明细时，两个外层单元格直接相接，
+        // 若都为 none 则小计之后那一行没有上边框；左右竖线仍由内层表格画
+        stroke: (top: 1pt, bottom: 1pt, left: none, right: none),
       ),)
     }
   }

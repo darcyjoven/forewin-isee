@@ -159,7 +159,8 @@
       cells += subtotal(group.subtotal)
     } else {
       // 最后一行 + 小计：整块不可拆分
-      // 内层表格只画左右竖线，上下横线交给相邻行，避免与外层边框叠成粗线
+      // 内层表格只画左右竖线；外层单元格补上上下横线（与主表格网格同宽），
+      // 这样即使相邻两组都只有一行明细（两个外层单元格直接相邻），小计之后也有上边框
       cells += (table.cell(
         block(
           breakable: false,
@@ -172,7 +173,7 @@
         ),
         colspan: widths.len(),
         inset: 0pt,
-        stroke: none,
+        stroke: (top: 1pt, bottom: 1pt, left: none, right: none),
       ),)
     }
   }
