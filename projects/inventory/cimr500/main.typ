@@ -295,10 +295,7 @@
     ),
     table.cell(
       fill: rgb(255, 255, 0),
-      // text(fill: fc(day-sale))[*#number(day-sale + data.forecast.sale.day, 2)W ★★★★★*],
-      text(
-        fill: fc(day-sale),
-      )[*#number(301.627, 2)W ★★★★★*],
+      text(fill: fc(day-sale))[*#number(day-sale + data.forecast.sale.day, 2)W ★★★★★*],
     ),
     [*Discrepancy(Day)*],
     [*差异（日）*],
