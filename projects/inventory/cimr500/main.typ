@@ -4,7 +4,7 @@
 #set page(width: 297mm, height: auto)
 #set text(size: 10pt, font: bussiness)
 #show heading: set text(font: bussiness)
-#let number(n, d) = [#num(n, digits: d, math: false)]
+#let number(n, d) = [#num(n, digits: d, group: (separator: ","), round: (precision: 2), math: false)]
 
 // 美元汇率
 #let rate(r1, r2) = {
@@ -85,6 +85,9 @@
         + data.sale.normal.month.fpc
         + data.sale.normal.month.comp
         + data.sale.resell.month
+        + data.sale.unsign.fpc
+        + data.sale.unsign.smt
+        + data.sale.unsign.comp
         - data.sale.return.month.smt
         - data.sale.return.month.fpc
         - data.sale.return.month.comp
@@ -292,7 +295,10 @@
     ),
     table.cell(
       fill: rgb(255, 255, 0),
-      text(fill: fc(day-sale))[*#number(day-sale + data.forecast.sale.day, 2)W ★★★★★*],
+      // text(fill: fc(day-sale))[*#number(day-sale + data.forecast.sale.day, 2)W ★★★★★*],
+      text(
+        fill: fc(day-sale),
+      )[*#number(301.627, 2)W ★★★★★*],
     ),
     [*Discrepancy(Day)*],
     [*差异（日）*],
@@ -302,8 +308,9 @@
     // 累计出货
     table.cell(rowspan: 2, align: horizon)[Cumulative sales],
     table.cell(rowspan: 2, align: horizon)[累计销售],
+    // 出货-销退-折扣
     [#number((
-        data.sale.normal.month.smt + data.sale.normal.month.fpc + data.sale.normal.month.comp - data.sale.return.month.smt - data.sale.return.month.fpc - data.sale.return.month.comp - data.sale.discount.month
+        (data.sale.normal.month.smt + data.sale.normal.month.fpc + data.sale.normal.month.comp) - (data.sale.return.month.smt + data.sale.return.month.fpc + data.sale.return.month.comp) - data.sale.discount.month
       ), 2)W],
     table.cell(
       align: left,
@@ -332,10 +339,11 @@
     // 应收
     table.cell(rowspan: 2, fill: rgb(255, 255, 0), align: horizon, text(fill: red)[*Accounts due*]),
     table.cell(rowspan: 2, fill: rgb(255, 255, 0), align: horizon, text(fill: red)[*实际应收*]),
+    // 出货 - 销退 - 折旧 + 转卖 + 未签收
     table.cell(
       fill: rgb(255, 255, 0),
       text(fill: red)[*#number((
-        (data.sale.normal.month.smt + data.sale.normal.month.fpc + data.sale.normal.month.comp - data.sale.return.month.smt - data.sale.return.month.fpc - data.sale.return.month.comp - data.sale.discount.month) + (data.sale.resell.month) + (data.sale.unsign.fpc + data.sale.unsign.smt + data.sale.unsign.comp)
+        (data.sale.normal.month.smt + data.sale.normal.month.fpc + data.sale.normal.month.comp) - (data.sale.return.month.smt + data.sale.return.month.fpc + data.sale.return.month.comp) - (data.sale.discount.month) + (data.sale.resell.month) + (data.sale.unsign.fpc + data.sale.unsign.smt + data.sale.unsign.comp)
       ), 2)W ★★★★★*],
     ),
     table.cell(align: left, fill: rgb(255, 255, 0), text(
@@ -388,6 +396,6 @@
 }
 
 
-#let data_source = sys.inputs.at("data", default: "data.T7sE.json")  // 数据来源
+#let data_source = sys.inputs.at("data", default: "data.0jITA.json")  // 数据来源
 #let data = json(data_source)
 #main(data)
