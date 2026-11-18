@@ -1,3 +1,13 @@
 fonts/*
 !fonts/download.sh
+
 json
+
+.agents
+.codebuddy
+
+*.pdf
+*.json
+
+# table 模块的示例输入 JSON 需要纳入版本管理
+!templates/table/*.json
