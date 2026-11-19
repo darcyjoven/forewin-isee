@@ -1,5 +1,13 @@
 {
     "tinymist.fontPaths": [
         "fonts",
-    ]
+    ],
+    "files.exclude": {
+        "**/.agents": true,
+        "**/.codebuddy": true,
+    },
+    "search.exclude": {
+        "**/.agents": true,
+        "**/.codebuddy": true,
+    },
 }
