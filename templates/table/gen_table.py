@@ -18,6 +18,11 @@ gen_table.py —— 【table 报表模块】根据 JSON 结构生成 Typst 表�
       表单字段取 form 的 key。列数在生成时固定，表头、明细、小计、合计、表单
       均按列/按字段逐条写出，便于对单列单独调整样式。
     * form / detail / total / subtotal 缺失时，不生成对应区块。
+    * 单元格垂直对齐统一为 horizon（基线对齐）：同一行内容落在同一条基线上，
+      某列换成多行时其余单元格处在行的垂直中部，不会全挤在行顶、行底留空。
+      需要贴顶 / 贴底时，把生成结果里的 + horizon 换成 + top / + bottom。
+    * 无小计时，数字列用 format-table 做小数点对齐（纯对齐：不加千分位、
+      不做舍入，按原值显示）；有小计时明细会包成嵌套表格，对齐会乱，故不做。
     * 生成物在运行时通过 sys.inputs（--input data=xxx.json）读取真实数据；
       data 默认值是输入 JSON 相对于项目根目录的路径，用 Typst 根相对写法
       （以 / 开头，与模板里的 /lib.typ 一致），因此与 .typ 文件放在哪里无关。
@@ -127,14 +132,37 @@ def generate(schema, default_data):
     a("// 按各处说明把对应的行改成行注释（Typst 注释为 //）即可。\n\n")
 
     # --- 导入 ---
+    imports = ["company-header", "page-count", "report-init", "table-count", "table-mark"]
+    # 无小计时才做小数点对齐：有小计的明细是嵌套表格，会让对齐错乱
+    align_numbers = any(numeric) and not schema["has_subtotal"]
+    if align_numbers:
+        imports.append("format-table")
     a("// 【固定·可注释】按需删去不用的导入（接下页要 table-count / table-mark）\n")
-    a('#import "/lib.typ": company-header, page-count, report-init, table-count, table-mark\n\n')
+    a('#import "/lib.typ": %s\n\n' % ", ".join(imports))
 
     # --- 页面 ---
     a("// 【固定·可注释】页面：公司抬头 + 页眉页脚 + 横向\n")
     a("// 不需要抬头/页码时，注释掉下面 #show 与 #set page 两行\n")
+    if schema["has_form"]:
+        a("// 表单值末尾拼一个空 box，避免值被当作数字解析；\n")
+        a("// 并保留单元格的 colspan（否则表格头排版会散）\n")
+        a("#let form-val(v) = [#v#box[]]\n\n")
     a("#show: report-init\n")
     a("#set page(\n  header: company-header(),\n  footer: page-count(),\n  flipped: true,\n)\n\n")
+
+    # --- 垂直对齐 ---
+    a("// ===== 【可配置】垂直对齐：所有单元格统一 horizon（基线对齐） =====\n")
+    a("// 某列换成多行时，其余单元格处在行的垂直中部，不会全挤在行顶；\n")
+    a("// 想改成贴顶 / 贴底，把下面所有 + horizon 换成 + top / + bottom\n\n")
+
+    # --- 小数点对齐（仅无小计时） ---
+    if align_numbers:
+        a("// ===== 数字列小数点对齐（仅无小计时；有小计的明细为嵌套表格，不做）=====\n")
+        a("// 纯对齐：不加千分位、不做舍入，数字按原值显示\n")
+        a("#let num-align = (math: false, group: (threshold: 999))\n")
+        a("#show table: format-table(\n")
+        a("  " + ", ".join("num-align" if n else "none" for n in numeric) + ",\n")
+        a(")\n\n")
 
     # --- 列宽 ---
     a("// ===== 【可配置】表格列宽：有几列写几列，逐列调整 =====\n")
@@ -157,8 +185,8 @@ def generate(schema, default_data):
         for start in range(0, len(fields), groups_per_row):
             chunk = fields[start:start + groups_per_row]
             for key in chunk:
-                a('  table.cell(text(%s), align: right, inset: (right: 2pt), stroke: none),\n' % tq(key + "："))
-                a('  table.cell([#data.%s], colspan: %d, align: left, inset: (left: 2pt), stroke: none),\n' % (key, value_span))
+                a('  table.cell(text(%s), align: right + horizon, inset: (right: 2pt), stroke: none),\n' % tq(key + "："))
+                a('  table.cell(form-val(data.%s), colspan: %d, align: left + horizon, inset: (left: 2pt), stroke: none),\n' % (key, value_span))
             # 不足一组时补空占位，保证每行都是整列数
             for _ in range(groups_per_row - len(chunk)):
                 a("  table.cell([], stroke: none),\n")
@@ -172,38 +200,36 @@ def generate(schema, default_data):
     a("// ===== 表头：逐列写出，单独改某列表头样式直接改对应单元格 =====\n")
     a("#let title() = table.header(\n  level: 2,\n")
     for col in schema["columns"]:
-        a("  text(%s),\n" % tq(col))
+        a("  table.cell(text(%s), align: left + horizon),\n" % tq(col))
     a(")\n\n")
 
     # --- 小计 ---
     if schema["has_subtotal"]:
         first = columns[0]
-        a("// ===== 小计：首列“名称 小计”，其余逐列写出；中间竖线不画，保留最左右两条 =====\n")
+        a("// ===== 小计：首列“名称 小计”，其余逐列写出；不画竖线，只画横线 =====\n")
         a("#let subtotal(rows) = {\n")
         a("  rows.map(row => (\n")
-        a("    table.cell([#row.%s 小计], align: left, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: 1pt, right: none)),\n" % first)
+        a("    table.cell([#row.%s 小计], align: left + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),\n" % first)
         rest = columns[1:]
-        for idx, (col, num) in enumerate(zip(rest, numeric[1:])):
-            stroke = ("(top: 1pt, bottom: 1pt, left: none, right: 1pt)"
-                      if idx == len(rest) - 1
-                      else "(top: 1pt, bottom: 1pt, left: none, right: none)")
-            a("    table.cell([#row.%s], align: %s, inset: (bottom: 5pt + 0.2em), stroke: %s),\n" % (col, "right" if num else "left", stroke))
+        stroke = "(top: 1pt, bottom: 1pt, left: none, right: none)"
+        for col, is_num in zip(rest, numeric[1:]):
+            val = "[#row.%s]" % col
+            a("    table.cell(%s, align: %s + horizon, inset: (bottom: 5pt + 0.2em), stroke: %s),\n" % (val, "right" if is_num else "left", stroke))
         a("  )).flatten()\n")
         a("}\n\n")
 
     # --- 合计 ---
     if schema["has_total"]:
         first = columns[0]
-        a("// ===== 合计：首列“合计”，其余逐列写出，整行加粗；竖线同小计 =====\n")
+        a("// ===== 合计：首列“合计”，其余逐列写出，整行加粗；竖线同小计，不画 =====\n")
         a("#let total(rows) = {\n")
         a("  rows.map(row => (\n")
-        a("    table.cell(strong([#row.%s 合计]), align: left, stroke: (top: 1pt, bottom: 1pt, left: 1pt, right: none)),\n" % first)
+        a("    table.cell(strong([#row.%s 合计]), align: left + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),\n" % first)
         rest = columns[1:]
-        for idx, (col, num) in enumerate(zip(rest, numeric[1:])):
-            stroke = ("(top: 1pt, bottom: 1pt, left: none, right: 1pt)"
-                      if idx == len(rest) - 1
-                      else "(top: 1pt, bottom: 1pt, left: none, right: none)")
-            a("    table.cell(strong([#row.%s]), align: %s, stroke: %s),\n" % (col, "right" if num else "left", stroke))
+        stroke = "(top: 1pt, bottom: 1pt, left: none, right: none)"
+        for col, is_num in zip(rest, numeric[1:]):
+            val = "[#row.%s]" % col
+            a("    table.cell(%s, align: %s + horizon, stroke: %s),\n" % (val, "right" if is_num else "left", stroke))
         a("  )).flatten()\n")
         a("}\n\n")
 
@@ -211,8 +237,9 @@ def generate(schema, default_data):
     if schema["has_detail"]:
         a("// ===== 单行明细：逐列写出，单独改某列样式直接改对应单元格 =====\n")
         a("#let detail-row(row) = (\n")
-        for col, num in zip(columns, numeric):
-            a("  table.cell([#row.%s], align: %s),\n" % (col, "right" if num else "left"))
+        for col, is_num in zip(columns, numeric):
+            val = "[#row.%s]" % col
+            a("  table.cell(%s, align: %s + horizon),\n" % (val, "right" if is_num else "left"))
         a(")\n\n")
         if schema["has_subtotal"]:
             a("""
@@ -285,10 +312,27 @@ def generate(schema, default_data):
 """)
 
     # --- 入口 ---
+    # 合计行号 = 表单行数 + 表头 1 行 + 明细行数（每组最后一行与小计合并为 1 行）
+    if schema["has_form"]:
+        ncols = len(columns)
+        groups_per_row = min(3, max(1, ncols // 2))
+        form_rows = (len(schema["form_fields"]) + groups_per_row - 1) // groups_per_row
+    else:
+        form_rows = 0
+    detail_expr = "data.detail.map(g => g.data.len()).sum()" if schema["has_detail"] else "0"
+
     a("// ===== 入口：按存在区块组装表格 =====\n")
     a("#let main(data, i) = {\n")
     a("  // 【接下页·可注释】本表起始页标记\n")
     a("  table-mark(index: i)\n\n")
+    if schema["has_total"]:
+        a("  // 对合计整行加粗\n")
+        a("  let total-y = %d + 1 + %s\n" % (form_rows, detail_expr))
+        a("  show table.cell: it => {\n")
+        a("    if it.y == total-y and it.body.func() != strong {\n")
+        a("      table.cell(strong(it.body), align: it.align, x: it.x, y: it.y, inset: it.inset, stroke: it.stroke)\n")
+        a("    } else { it }\n")
+        a("  }\n\n")
     a("  table(\n    columns: widths,\n    stroke: 1pt + black,\n")
     if schema["has_form"]:
         a("    // 表单\n    form(data.form),\n")

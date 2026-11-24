@@ -8,26 +8,35 @@
   flipped: true, // 固定横向
 )
 
+// 表单值末尾拼一个空 box，避免值被当作数字解析，
+// 并保留单元格的 colspan（否则表格头排版会散）
+#let form-val(v) = [#v#box[]]
+
 // ============ 列宽 ============
 // 有几列写几列；单独调某列宽度只改这里对应的一项
 // 增删列时，同步修改 form / title / subtotal / total / detail-row 中对应的单元格
 #let widths = (1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr, 1fr)
+
+// ============ 垂直对齐 ============
+// 各处单元格统一用 horizon（基线对齐）：同一行的内容落在同一条基线上，
+// 某列换成多行时，其余单元格自动处在行的垂直中部，不会全挤在行顶、行底留一大块空白。
+// 想改成贴顶 / 贴底，把下面所有 + horizon 换成 + top / + bottom 即可
 
 // ============ 表单（key: value） ============
 // 每行 3 组，每组 = 标签 1 列 + 值 2 列；标签右对齐、值左对齐并紧靠，整块无边框
 // 逐字段写出，某个字段要单独改样式或调顺序，直接改对应两行
 #let form(data) = table.header(
   level: 1,
-  table.cell(text("docno："), align: right, inset: (right: 2pt), stroke: none),
-  table.cell([#data.docno], colspan: 2, align: left, inset: (left: 2pt), stroke: none),
-  table.cell(text("dat："), align: right, inset: (right: 2pt), stroke: none),
-  table.cell([#data.dat], colspan: 2, align: left, inset: (left: 2pt), stroke: none),
-  table.cell(text("item："), align: right, inset: (right: 2pt), stroke: none),
-  table.cell([#data.item], colspan: 2, align: left, inset: (left: 2pt), stroke: none),
-  table.cell(text("qty："), align: right, inset: (right: 2pt), stroke: none),
-  table.cell([#data.qty], colspan: 2, align: left, inset: (left: 2pt), stroke: none),
-  table.cell(text("stock："), align: right, inset: (right: 2pt), stroke: none),
-  table.cell([#data.stock], colspan: 2, align: left, inset: (left: 2pt), stroke: none),
+  table.cell(text("docno："), align: right + horizon, inset: (right: 2pt), stroke: none),
+  table.cell(form-val(data.docno), colspan: 2, align: left + horizon, inset: (left: 2pt), stroke: none),
+  table.cell(text("dat："), align: right + horizon, inset: (right: 2pt), stroke: none),
+  table.cell(form-val(data.dat), colspan: 2, align: left + horizon, inset: (left: 2pt), stroke: none),
+  table.cell(text("item："), align: right + horizon, inset: (right: 2pt), stroke: none),
+  table.cell(form-val(data.item), colspan: 2, align: left + horizon, inset: (left: 2pt), stroke: none),
+  table.cell(text("qty："), align: right + horizon, inset: (right: 2pt), stroke: none),
+  table.cell(form-val(data.qty), colspan: 2, align: left + horizon, inset: (left: 2pt), stroke: none),
+  table.cell(text("stock："), align: right + horizon, inset: (right: 2pt), stroke: none),
+  table.cell(form-val(data.stock), colspan: 2, align: left + horizon, inset: (left: 2pt), stroke: none),
   // 不足 3 组时补空占位，保证每行都是整列数
   table.cell([], stroke: none),
   table.cell([], colspan: 2, stroke: none),
@@ -37,62 +46,62 @@
 // 逐列写出；改表头文字或单独加样式，直接改对应单元格
 #let title() = table.header(
   level: 2,
-  text("h1"),
-  text("h2"),
-  text("h3"),
-  text("h4"),
-  text("h5"),
-  text("h6"),
-  text("h7"),
-  text("h8"),
-  text("h9"),
+  table.cell(text("h1"), align: left + horizon),
+  table.cell(text("h2"), align: left + horizon),
+  table.cell(text("h3"), align: left + horizon),
+  table.cell(text("h4"), align: left + horizon),
+  table.cell(text("h5"), align: left + horizon),
+  table.cell(text("h6"), align: left + horizon),
+  table.cell(text("h7"), align: left + horizon),
+  table.cell(text("h8"), align: left + horizon),
+  table.cell(text("h9"), align: left + horizon),
 )
 
 // ============ 小计 ============
 // 首列“名称 小计”，其余逐列写出；对齐方式由 gen_table.py 按 JSON 值类型决定
-// 中间竖线不画，只保留最左、最右两条竖线；横线为 1pt
+// 不画任何竖线；横线为 1pt
 #let subtotal(rows) = {
   rows.map(row => (
-    table.cell([#row.h1 小计], align: left, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: 1pt, right: none)),
-    table.cell([#row.h2], align: left, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell([#row.h3], align: right, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell([#row.h4], align: left, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell([#row.h5], align: right, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell([#row.h6], align: right, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell([#row.h7], align: left, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell([#row.h8], align: left, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell([#row.h9], align: left, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: 1pt)),
+    table.cell([#row.h1 小计], align: left + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h2], align: left + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h3], align: right + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h4], align: left + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h5], align: right + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h6], align: right + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h7], align: left + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h8], align: left + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h9], align: left + horizon, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
   )).flatten()
 }
 
 // ============ 合计 ============
-// 首列“合计”，其余逐列写出，整行加粗；竖线同小计，只保留最左、最右两条
+// 首列“合计”，其余逐列写出，整行加粗；竖线同小计，不画
 #let total(rows) = {
   rows.map(row => (
-    table.cell(strong([#row.h1 合计]), align: left, stroke: (top: 1pt, bottom: 1pt, left: 1pt, right: none)),
-    table.cell(strong([#row.h2]), align: left, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell(strong([#row.h3]), align: right, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell(strong([#row.h4]), align: left, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell(strong([#row.h5]), align: right, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell(strong([#row.h6]), align: right, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell(strong([#row.h7]), align: left, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell(strong([#row.h8]), align: left, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
-    table.cell(strong([#row.h9]), align: left, stroke: (top: 1pt, bottom: 1pt, left: none, right: 1pt)),
+    table.cell(strong([#row.h1 合计]), align: left + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h2], align: left + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h3], align: right + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h4], align: left + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h5], align: right + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h6], align: right + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h7], align: left + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h8], align: left + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
+    table.cell([#row.h9], align: left + horizon, stroke: (top: 1pt, bottom: 1pt, left: none, right: none)),
   )).flatten()
 }
 
 // ============ 明细 ============
 // 单行明细：逐列写出，单独改某列样式直接改对应行
 #let detail-row(row) = (
-  table.cell([#row.h1], align: left),
-  table.cell([#row.h2], align: left),
-  table.cell([#row.h3], align: right),
-  table.cell([#row.h4], align: left),
-  table.cell([#row.h5], align: right),
-  table.cell([#row.h6], align: right),
-  table.cell([#row.h7], align: left),
-  table.cell([#row.h8], align: left),
-  table.cell([#row.h9], align: left),
+  table.cell([#row.h1], align: left + horizon),
+  table.cell([#row.h2], align: left + horizon),
+  table.cell([#row.h3], align: right + horizon),
+  table.cell([#row.h4], align: left + horizon),
+  table.cell([#row.h5], align: right + horizon),
+  table.cell([#row.h6], align: right + horizon),
+  table.cell([#row.h7], align: left + horizon),
+  table.cell([#row.h8], align: left + horizon),
+  table.cell([#row.h9], align: left + horizon),
 )
 
 // 按组输出：data 行之后紧跟该组小计
@@ -151,6 +160,15 @@
 #let main(data, i) = {
   // 本表起始页标记：供 footer 计算本表（而非整份文档）的页数
   table-mark(index: i)
+
+  // 合计行号 = 表单行数 + 表头 1 行 + 明细行数（每组最后一行与小计合并为 1 行）
+  // 对合计整行加粗
+  let total-y = 2 + 1 + data.detail.map(g => g.data.len()).sum()
+  show table.cell: it => {
+    if it.y == total-y and it.body.func() != strong {
+      table.cell(strong(it.body), align: it.align, x: it.x, y: it.y, inset: it.inset, stroke: it.stroke)
+    } else { it }
+  }
 
   table(
     columns: widths,
