@@ -15,9 +15,12 @@ gen_table.py —— 【table 报表模块】根据 JSON 结构生成 Typst 表�
 生成规则:
     * 只读取第一层数组的第一个对象来推断结构，其余数据不读取。
     * 表格列名取 detail[0].data[0] 的 key（无 detail 时取 total[0] 的 key）；
-      表单字段取 form 的 key。两者都生成为可直接修改的常量。
+      表单字段取 form 的 key。列数在生成时固定，表头、明细、小计、合计、表单
+      均按列/按字段逐条写出，便于对单列单独调整样式。
     * form / detail / total / subtotal 缺失时，不生成对应区块。
-    * 生成物在运行时通过 sys.inputs（--input data=xxx.json）读取真实数据。
+    * 生成物在运行时通过 sys.inputs（--input data=xxx.json）读取真实数据；
+      data 默认值是输入 JSON 相对于项目根目录的路径，用 Typst 根相对写法
+      （以 / 开头，与模板里的 /lib.typ 一致），因此与 .typ 文件放在哪里无关。
     * 公司抬头、页眉页脚、接下页等固定部分全部包含，并用醒目注释标记，
       方便整块注释掉。
 """
@@ -35,6 +38,19 @@ def fail(message):
 def tq(value):
     """生成 Typst 字符串字面量（正确转义引号、反斜杠等）。"""
     return json.dumps(value, ensure_ascii=False)
+
+
+def find_project_root(start):
+    """从起始目录逐级向上找项目根目录：含 .git 或 CODEBUDDY.md 的第一层。"""
+    current = os.path.abspath(start)
+    while True:
+        if (os.path.exists(os.path.join(current, ".git"))
+                or os.path.exists(os.path.join(current, "CODEBUDDY.md"))):
+            return current
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
 
 
 def load_schema(path):
@@ -82,9 +98,15 @@ def load_schema(path):
     if not isinstance(first_row, dict) or not first_row:
         fail("无法确定表格列：detail[0].data[0] 与 total[0] 均不可用")
     columns = list(first_row.keys())
+    # 由脚本按首行值的类型决定该列对齐方式，模板里不再做运行时类型判断
+    numeric = [
+        isinstance(first_row[col], (int, float)) and not isinstance(first_row[col], bool)
+        for col in columns
+    ]
 
     return {
         "columns": columns,
+        "numeric": numeric,
         "form_fields": list(form.keys()) if has_form else [],
         "has_form": has_form,
         "has_detail": has_detail,
@@ -93,9 +115,11 @@ def load_schema(path):
     }
 
 
-def generate(schema, default_json):
+def generate(schema, default_data):
     L = []
     a = L.append
+    columns = schema["columns"]
+    numeric = schema["numeric"]
 
     # --- 头部说明 ---
     a("// 本文件由 gen_table.py 根据 JSON 结构自动生成，可直接手工修改。\n")
@@ -104,7 +128,7 @@ def generate(schema, default_json):
 
     # --- 导入 ---
     a("// 【固定·可注释】按需删去不用的导入（接下页要 table-count / table-mark）\n")
-    a('#import "/lib.typ": company-header, negative, page-count, report-init, table-count, table-mark\n\n')
+    a('#import "/lib.typ": company-header, page-count, report-init, table-count, table-mark\n\n')
 
     # --- 页面 ---
     a("// 【固定·可注释】页面：公司抬头 + 页眉页脚 + 横向\n")
@@ -112,145 +136,91 @@ def generate(schema, default_json):
     a("#show: report-init\n")
     a("#set page(\n  header: company-header(),\n  footer: page-count(),\n  flipped: true,\n)\n\n")
 
-    # --- 列定义 ---
-    a("// ===== 【可配置】表格列：title 取 JSON 的 key，可直接改成中文 =====\n")
-    a("#let fields = (\n")
-    for col in schema["columns"]:
-        a("  (key: %s, title: %s, width: 1fr),\n" % (tq(col), tq(col)))
-    a(")\n")
-    a("#let widths = fields.map(field => field.width)\n")
-    a("#let row-values(row) = fields.map(field => row.at(field.key, default: none))\n\n")
+    # --- 列宽 ---
+    a("// ===== 【可配置】表格列宽：有几列写几列，逐列调整 =====\n")
+    a("#let widths = (")
+    a(", ".join("1fr" for _ in columns))
+    a(")\n\n")
 
-    # --- 表单字段 ---
+    # --- 表单 ---
     if schema["has_form"]:
-        a("// ===== 【可配置】表单字段：(JSON 的 key, 标签)，标签默认同为 key =====\n")
-        a("#let form-fields = (\n")
-        for key in schema["form_fields"]:
-            a("  (%s, %s),\n" % (tq(key), tq(key)))
-        a(")\n\n")
-
-        ncols = len(schema["columns"])
+        ncols = len(columns)
         # 每组至少占 2 列（标签 1 + 值 1）；每行最多 3 组，列少时自动减少组数
         groups_per_row = min(3, max(1, ncols // 2))
         per_group = max(2, ncols // groups_per_row)
         value_span = per_group - 1
         trailing = ncols - groups_per_row * per_group
-        trailing_line = ""
-        if trailing > 0:
-            trailing_line = "    cells += (table.cell([], colspan: %d, stroke: none),)\n" % trailing
-        form_tpl = """
-// ===== 表单：每行 GPR 组（按列数自适应），标签右对齐、值左对齐并紧靠，整块无边框 =====
-#let form(data) = {
-  let cells = ()
-  for chunk in form-fields.chunks(GPR) {
-    for (key, label) in chunk {
-      cells += (
-        table.cell([#label：], align: right, inset: (right: 2pt), stroke: none),
-        table.cell([#data.at(key, default: none)], colspan: VALUE_SPAN, align: left, inset: (left: 2pt), stroke: none),
-      )
-    }
-    for _ in range(GPR - chunk.len()) {
-      cells += (table.cell([], stroke: none), table.cell([], colspan: VALUE_SPAN, stroke: none))
-    }
-TRAILING_LINE  }
-  table.header(level: 1, ..cells)
-}
+        fields = schema["form_fields"]
 
-"""
-        a(form_tpl.replace("VALUE_SPAN", str(value_span))
-                   .replace("TRAILING_LINE", trailing_line)
-                   .replace("GPR", str(groups_per_row)))
+        a("// ===== 表单：逐字段写出，标签右对齐、值左对齐并紧靠，整块无边框 =====\n")
+        a("#let form(data) = table.header(\n  level: 1,\n")
+        for start in range(0, len(fields), groups_per_row):
+            chunk = fields[start:start + groups_per_row]
+            for key in chunk:
+                a('  table.cell(text(%s), align: right, inset: (right: 2pt), stroke: none),\n' % tq(key + "："))
+                a('  table.cell([#data.%s], colspan: %d, align: left, inset: (left: 2pt), stroke: none),\n' % (key, value_span))
+            # 不足一组时补空占位，保证每行都是整列数
+            for _ in range(groups_per_row - len(chunk)):
+                a("  table.cell([], stroke: none),\n")
+                a("  table.cell([], colspan: %d, stroke: none),\n" % value_span)
+            # 列数除不尽时，每行末尾补足剩余列
+            if trailing > 0:
+                a("  table.cell([], colspan: %d, stroke: none),\n" % trailing)
+        a(")\n\n")
 
     # --- 表头 ---
-    a("// ===== 表头：列名取 fields.title =====\n")
-    a("#let title() = {\n  table.header(level: 2, ..fields.map(field => [#field.title]))\n}\n\n")
+    a("// ===== 表头：逐列写出，单独改某列表头样式直接改对应单元格 =====\n")
+    a("#let title() = table.header(\n  level: 2,\n")
+    for col in schema["columns"]:
+        a("  text(%s),\n" % tq(col))
+    a(")\n\n")
 
     # --- 小计 ---
     if schema["has_subtotal"]:
-        a("""
-// ===== 小计：上方 0.5pt 单线、无竖线、下方留 0.2em；首列“名称 小计” =====
-#let subtotal(rows) = {
-  if type(rows) != array { rows = () }
-  rows
-    .map(row => {
-      let values = row-values(row)
-      values
-        .enumerate()
-        .map(((i, value)) => {
-          let numeric = type(value) == int or type(value) == float
-          table.cell(
-            if i == 0 {
-              if value == none { [小计] } else { [#value 小计] }
-            } else if numeric {
-              negative(value)
-            } else {
-              [#value]
-            },
-            align: if numeric { right } else { left },
-            stroke: (top: 0.5pt, left: none, right: none),
-            inset: (bottom: 5pt + 0.2em),
-          )
-        })
-    })
-    .flatten()
-}
-
-""")
+        first = columns[0]
+        a("// ===== 小计：首列“名称 小计”，其余逐列写出；中间竖线不画，保留最左右两条 =====\n")
+        a("#let subtotal(rows) = {\n")
+        a("  rows.map(row => (\n")
+        a("    table.cell([#row.%s 小计], align: left, inset: (bottom: 5pt + 0.2em), stroke: (top: 1pt, bottom: 1pt, left: 1pt, right: none)),\n" % first)
+        rest = columns[1:]
+        for idx, (col, num) in enumerate(zip(rest, numeric[1:])):
+            stroke = ("(top: 1pt, bottom: 1pt, left: none, right: 1pt)"
+                      if idx == len(rest) - 1
+                      else "(top: 1pt, bottom: 1pt, left: none, right: none)")
+            a("    table.cell([#row.%s], align: %s, inset: (bottom: 5pt + 0.2em), stroke: %s),\n" % (col, "right" if num else "left", stroke))
+        a("  )).flatten()\n")
+        a("}\n\n")
 
     # --- 合计 ---
     if schema["has_total"]:
-        a("""
-// ===== 合计：上方 0.75pt、下方 0.5pt、无竖线、整行加粗；首列“合计” =====
-#let total(rows) = {
-  if type(rows) != array { rows = () }
-  rows
-    .map(row => {
-      let values = row-values(row)
-      values
-        .enumerate()
-        .map(((i, value)) => {
-          let numeric = type(value) == int or type(value) == float
-          table.cell(
-            strong(if i == 0 {
-              if value == none { [合计] } else { [#value 合计] }
-            } else if numeric {
-              negative(value)
-            } else {
-              [#value]
-            }),
-            align: if numeric { right } else { left },
-            stroke: (top: 0.75pt, bottom: 0.5pt, left: none, right: none),
-          )
-        })
-    })
-    .flatten()
-}
-
-""")
+        first = columns[0]
+        a("// ===== 合计：首列“合计”，其余逐列写出，整行加粗；竖线同小计 =====\n")
+        a("#let total(rows) = {\n")
+        a("  rows.map(row => (\n")
+        a("    table.cell(strong([#row.%s 合计]), align: left, stroke: (top: 1pt, bottom: 1pt, left: 1pt, right: none)),\n" % first)
+        rest = columns[1:]
+        for idx, (col, num) in enumerate(zip(rest, numeric[1:])):
+            stroke = ("(top: 1pt, bottom: 1pt, left: none, right: 1pt)"
+                      if idx == len(rest) - 1
+                      else "(top: 1pt, bottom: 1pt, left: none, right: none)")
+            a("    table.cell(strong([#row.%s]), align: %s, stroke: %s),\n" % (col, "right" if num else "left", stroke))
+        a("  )).flatten()\n")
+        a("}\n\n")
 
     # --- 明细 ---
     if schema["has_detail"]:
-        a("""
-// ===== 单行明细单元格：数值右对齐、负数加括号 =====
-#let detail-row(row) = {
-  row-values(row).map(value => {
-    let numeric = type(value) == int or type(value) == float
-    table.cell(
-      if numeric { negative(value) } else { [#value] },
-      align: if numeric { right } else { left },
-    )
-  })
-}
-
-""")
+        a("// ===== 单行明细：逐列写出，单独改某列样式直接改对应单元格 =====\n")
+        a("#let detail-row(row) = (\n")
+        for col, num in zip(columns, numeric):
+            a("  table.cell([#row.%s], align: %s),\n" % (col, "right" if num else "left"))
+        a(")\n\n")
         if schema["has_subtotal"]:
             a("""
-// ===== 明细：每组 data 行 + 小计；最后一行与小计绑成不可拆分块 =====
+// ===== 明细：每组 data 行 + 小计；最后一行与小计绑成不可拆分块（外层只画横线） =====
 #let detail(groups) = {
-  if type(groups) != array { groups = () }
   let cells = ()
   for group in groups {
-    let rows = if type(group.data) == array { group.data } else { () }
+    let rows = group.data
     if rows.len() > 1 {
       for row in rows.slice(0, rows.len() - 1) {
         cells += detail-row(row)
@@ -264,15 +234,13 @@ TRAILING_LINE  }
           breakable: false,
           table(
             columns: widths,
-            stroke: (left: 1pt, right: 1pt, top: none, bottom: none),
+            stroke: 1pt + black,
             ..detail-row(rows.last()),
             ..subtotal(group.subtotal),
           ),
         ),
         colspan: widths.len(),
         inset: 0pt,
-        // 自画上下横线：相邻两组都只有一行明细时，两个外层单元格直接相接，
-        // 若都为 none 则小计之后那一行没有上边框；左右竖线仍由内层表格画
         stroke: (top: 1pt, bottom: 1pt, left: none, right: none),
       ),)
     }
@@ -285,10 +253,9 @@ TRAILING_LINE  }
             a("""
 // ===== 明细：仅 data 行（无小计） =====
 #let detail(groups) = {
-  if type(groups) != array { groups = () }
   let cells = ()
   for group in groups {
-    let rows = if type(group.data) == array { group.data } else { () }
+    let rows = group.data
     for row in rows {
       cells += detail-row(row)
     }
@@ -322,9 +289,9 @@ TRAILING_LINE  }
     a("#let main(data, i) = {\n")
     a("  // 【接下页·可注释】本表起始页标记\n")
     a("  table-mark(index: i)\n\n")
-    a("  table(\n    columns: widths,\n")
+    a("  table(\n    columns: widths,\n    stroke: 1pt + black,\n")
     if schema["has_form"]:
-        a("    // 表单\n    ..(if data.form.len() > 0 { (form(data.form),) } else { () }),\n")
+        a("    // 表单\n    form(data.form),\n")
     a("    // 表头\n    title(),\n")
     if schema["has_detail"]:
         a("    // 明细 + 小计\n    ..detail(data.detail),\n")
@@ -334,8 +301,8 @@ TRAILING_LINE  }
     a("  )\n}\n\n")
 
     # --- 数据源 ---
-    a("// ===== 数据源：编译时用 --input data=xxx.json 传入真实数据 =====\n")
-    a('#let data_source = sys.inputs.at("data", default: %s)\n' % tq(default_json))
+    a("// ===== 数据源：默认值为项目根相对路径；编译时可用 --input data=xxx.json 覆盖 =====\n")
+    a('#let data_source = sys.inputs.at("data", default: %s)\n' % tq(default_data))
     a("#let data = json(data_source)\n")
     a("#data.enumerate().map(((i, doc)) => main(doc, i)).join(pagebreak())\n")
 
@@ -352,7 +319,20 @@ def main(argv):
 
     json_path, out_path = argv[1], argv[2]
     schema = load_schema(json_path)
-    content = generate(schema, os.path.basename(json_path))
+
+    # 默认数据路径相对项目根目录，并用 Typst 的根相对写法（/ 开头）
+    root = find_project_root(os.path.dirname(os.path.abspath(__file__)))
+    if root is None:
+        fail("无法识别项目根目录（向上未找到 .git 或 CODEBUDDY.md）")
+    json_abs = os.path.abspath(json_path)
+    data_rel = os.path.relpath(json_abs, root).replace(os.sep, "/")
+    if data_rel.startswith(".."):
+        # 数据不在项目内时退回相对 .typ 的路径，避免 /../ 越出 root
+        data_rel = os.path.relpath(json_abs, os.path.dirname(os.path.abspath(out_path))).replace(os.sep, "/")
+        default_data = data_rel
+    else:
+        default_data = "/" + data_rel
+    content = generate(schema, default_data)
 
     parent = os.path.dirname(os.path.abspath(out_path))
     if parent and not os.path.isdir(parent):
